@@ -6,7 +6,8 @@ from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from .models import Goal, Transaction
+from .models import Achievement, Goal, Transaction, UserAchievement
+from .utils import check_and_award_achievements
 
 
 class TransactionForm(forms.ModelForm):
@@ -105,8 +106,12 @@ def dashboard(request):
 
     if request.user.is_authenticated:
         goal = Goal.objects.filter(user=request.user).first()
+        earned_achievement_ids = list(
+            UserAchievement.objects.filter(user=request.user).values_list("achievement_id", flat=True)
+        )
     else:
         goal = None
+        earned_achievement_ids = []
 
     transactions = Transaction.objects.all()[:10]
     total_income = Transaction.objects.filter(transaction_type="income").aggregate(total=Sum("amount"))["total"] or Decimal("0")
@@ -183,12 +188,19 @@ def dashboard(request):
                     saved_goal.user = None
                 saved_goal.save()
                 goal = saved_goal
+                if request.user.is_authenticated:
+                    check_and_award_achievements(request.user)
                 messages.success(request, "Ціль успішно оновлено.")
                 return redirect("dashboard")
         else:
             transaction_form = TransactionForm(request.POST)
             if transaction_form.is_valid():
-                transaction_form.save()
+                transaction = transaction_form.save(commit=False)
+                if request.user.is_authenticated:
+                    transaction.user = request.user
+                transaction.save()
+                if request.user.is_authenticated:
+                    check_and_award_achievements(request.user)
                 messages.success(request, "Транзакцію додано успішно.")
                 return redirect("dashboard")
 
@@ -213,5 +225,7 @@ def dashboard(request):
             "remaining_to_goal": remaining_to_goal,
             "transaction_form": transaction_form,
             "goal_form": goal_form,
+            "achievements": Achievement.objects.all(),
+            "earned_achievement_ids": earned_achievement_ids,
         },
     )

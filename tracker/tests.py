@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Goal, Transaction
+from .models import Achievement, Goal, Transaction, UserAchievement
 
 
 class DashboardMonthlyHistoryTests(TestCase):
@@ -76,3 +76,24 @@ class GoalEmptyStateTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["goal"], current_goal)
         self.assertEqual(response.context["goal_name"], "Моя ціль")
+
+
+class AchievementTests(TestCase):
+    def test_achievements_are_awarded_for_key_actions(self):
+        user = get_user_model().objects.create_user(username="charlie", password="secret123")
+
+        Transaction.objects.create(amount=Decimal("15000.00"), transaction_type="income", category="Премія", user=user)
+        Goal.objects.create(user=user, name="Подорож", target_amount=Decimal("20000.00"))
+
+        from .utils import check_and_award_achievements
+
+        check_and_award_achievements(user)
+
+        self.assertTrue(Achievement.objects.filter(condition_key="first_step").exists())
+        self.assertTrue(Achievement.objects.filter(condition_key="goal_setter").exists())
+        self.assertTrue(Achievement.objects.filter(condition_key="big_money").exists())
+        self.assertEqual(UserAchievement.objects.filter(user=user).count(), 3)
+        self.assertEqual(
+            set(UserAchievement.objects.filter(user=user).values_list("achievement__condition_key", flat=True)),
+            {"first_step", "goal_setter", "big_money"},
+        )
