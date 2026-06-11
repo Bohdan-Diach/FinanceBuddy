@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="uk" class="h-full bg-slate-950">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FinanceBuddy Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body class="min-h-full bg-slate-950 text-slate-100">
+    <div class="mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-8 sm:px-6 lg:px-8">
+      <header class="mb-8 flex flex-col gap-4 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-cyan-950/30 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="text-sm font-semibold uppercase tracking-[0.3em] text-cyan-400">FinanceBuddy</p>
+          <h1 class="mt-2 text-3xl font-semibold">Ваш персональний фінансовий дашборд</h1>
+          <p class="mt-2 text-sm text-slate-400">Контролюйте доходи, витрати та баланс без зайвого шуму.</p>
+        </div>
+        <div class="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-5 py-4 text-right">
+          <p class="text-sm text-slate-400">Поточний баланс</p>
+          <p class="mt-1 text-3xl font-semibold text-cyan-300">₴{{ balance|floatformat:2 }}</p>
+        </div>
+      </header>
+
+      {% if messages %}
+        <div class="mb-6 space-y-2">
+          {% for message in messages %}
+            <div class="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <main class="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+        <section class="space-y-6">
+          <div class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl shadow-black/20">
+            <div class="mb-6 flex items-center justify-between">
+              <div>
+                <h2 class="text-xl font-semibold">Останні транзакції</h2>
+                <p class="text-sm text-slate-400">10 найновіших записів</p>
+              </div>
+            </div>
+
+            <div class="overflow-hidden rounded-2xl border border-slate-800">
+              <table class="min-w-full divide-y divide-slate-800 text-sm">
+                <thead class="bg-slate-950/70">
+                  <tr>
+                    <th class="px-4 py-3 text-left font-medium text-slate-300">Дата</th>
+                    <th class="px-4 py-3 text-left font-medium text-slate-300">Категорія</th>
+                    <th class="px-4 py-3 text-left font-medium text-slate-300">Тип</th>
+                    <th class="px-4 py-3 text-right font-medium text-slate-300">Сума</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800 bg-slate-900/60">
+                  {% for transaction in transactions %}
+                    <tr>
+                      <td class="px-4 py-3 text-slate-300">{{ transaction.date }}</td>
+                      <td class="px-4 py-3 text-slate-300">{{ transaction.category }}</td>
+                      <td class="px-4 py-3">
+                        {% if transaction.transaction_type == 'income' %}
+                          <span class="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-300">Дохід</span>
+                        {% else %}
+                          <span class="rounded-full bg-rose-500/15 px-2.5 py-1 text-xs font-medium text-rose-300">Витрата</span>
+                        {% endif %}
+                      </td>
+                      <td class="px-4 py-3 text-right font-medium {% if transaction.transaction_type == 'income' %}text-emerald-300{% else %}text-rose-300{% endif %}">
+                        {% if transaction.transaction_type == 'income' %}+{% else %}-{% endif %}₴{{ transaction.amount }}
+                      </td>
+                    </tr>
+                  {% empty %}
+                    <tr>
+                      <td colspan="4" class="px-4 py-8 text-center text-slate-400">Транзакцій поки немає.</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl shadow-black/20">
+            <div class="mb-6 flex items-center justify-between">
+              <div>
+                <h2 class="text-xl font-semibold">Моя ціль</h2>
+                <p class="text-sm text-slate-400">{{ goal_name }}</p>
+              </div>
+              <div class="text-right">
+                <p class="text-sm text-slate-400">Залишилось</p>
+                <p class="text-lg font-semibold text-cyan-300">₴{{ remaining_to_goal|floatformat:2 }}</p>
+              </div>
+            </div>
+            <div class="h-3 w-full overflow-hidden rounded-full bg-slate-800">
+              <div class="h-full rounded-full bg-cyan-500" style="width: {{ progress_percentage|floatformat:0 }}%"></div>
+            </div>
+            <div class="mt-3 flex items-center justify-between text-sm text-slate-400">
+              <span>Прогрес: {{ progress_percentage|floatformat:0 }}%</span>
+              <span>Ціль: ₴{{ goal_target|floatformat:2 }}</span>
+            </div>
+            <button id="toggle-goal-form" type="button" class="mt-4 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-300 transition hover:bg-cyan-500/20">
+              Змінити ціль
+            </button>
+            <form id="goal-edit-form" method="post" class="mt-4 hidden space-y-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              {% csrf_token %}
+              <input type="hidden" name="goal_submit" value="1" />
+              <div>
+                <label class="mb-2 block text-sm text-slate-300" for="id_name">Назва цілі</label>
+                {{ goal_form.name }}
+              </div>
+              <div>
+                <label class="mb-2 block text-sm text-slate-300" for="id_target_amount">Сума цілі</label>
+                {{ goal_form.target_amount }}
+              </div>
+              <button type="submit" class="w-full rounded-2xl bg-cyan-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-400">
+                Зберегти ціль
+              </button>
+            </form>
+          </div>
+
+          <div class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl shadow-black/20">
+            <div class="mb-6">
+              <h2 class="text-xl font-semibold">💡 Поради</h2>
+              <p class="mt-1 text-sm text-slate-400">Аналітика на основі поточного місяця.</p>
+            </div>
+            <div class="space-y-3">
+              {% for insight in insights %}
+                <div class="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-sm text-slate-300">
+                  {{ insight }}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </section>
+
+        <section class="space-y-6">
+          <div class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl shadow-black/20">
+            <div class="mb-6">
+              <h2 class="text-xl font-semibold">Додати транзакцію</h2>
+              <p class="mt-1 text-sm text-slate-400">Створіть новий запис про дохід або витрату.</p>
+            </div>
+
+            <form method="post" class="space-y-4">
+              {% csrf_token %}
+              <div>
+                <label class="mb-2 block text-sm text-slate-300" for="id_amount">Сума</label>
+                {{ transaction_form.amount }}
+              </div>
+              <div>
+                <label class="mb-2 block text-sm text-slate-300" for="id_transaction_type">Тип</label>
+                {{ transaction_form.transaction_type }}
+              </div>
+              <div>
+                <label class="mb-2 block text-sm text-slate-300" for="id_category">Категорія</label>
+                {{ transaction_form.category }}
+                <p id="category-hint" class="mt-2 text-sm text-slate-400">Спочатку оберіть тип</p>
+              </div>
+              <div>
+                <label class="mb-2 block text-sm text-slate-300" for="id_date">Дата</label>
+                {{ transaction_form.date }}
+              </div>
+              <button type="submit" class="w-full rounded-2xl bg-cyan-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-400">
+                Зберегти транзакцію
+              </button>
+            </form>
+          </div>
+
+          <div class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl shadow-black/20">
+            <div class="mb-6">
+              <h2 class="text-xl font-semibold">Витрати за категоріями</h2>
+              <p class="mt-1 text-sm text-slate-400">За поточний місяць</p>
+            </div>
+            <div class="mx-auto flex h-64 max-w-sm items-center justify-center">
+              <canvas id="expensesChart"></canvas>
+            </div>
+            {{ expense_labels|json_script:"expense-labels" }}
+            {{ expense_values|json_script:"expense-values" }}
+          </div>
+
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+              <p class="text-sm text-slate-400">Доходи за місяць</p>
+              <p class="mt-1 text-xl font-semibold text-emerald-300">₴{{ monthly_income|floatformat:2 }}</p>
+            </div>
+            <div class="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4">
+              <p class="text-sm text-slate-400">Витрати за місяць</p>
+              <p class="mt-1 text-xl font-semibold text-rose-300">₴{{ monthly_expense|floatformat:2 }}</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const labels = JSON.parse(document.getElementById('expense-labels').textContent);
+      const values = JSON.parse(document.getElementById('expense-values').textContent);
+      const ctx = document.getElementById('expensesChart');
+
+      if (ctx) {
+        new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: labels,
+            datasets: [{
+              data: values,
+              backgroundColor: ['#38bdf8', '#f472b6', '#34d399', '#f59e0b', '#8b5cf6', '#fb7185'],
+              borderColor: '#0f172a',
+              borderWidth: 2,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: { color: '#e2e8f0' }
+              }
+            }
+          }
+        });
+      }
+
+      const typeSelect = document.getElementById('id_transaction_type');
+      const categorySelect = document.getElementById('id_category');
+      const categoryHint = document.getElementById('category-hint');
+      const toggleGoalButton = document.getElementById('toggle-goal-form');
+      const goalEditForm = document.getElementById('goal-edit-form');
+
+      const incomeCategories = ['Зарплата', 'Премія', 'Подарунок', 'Інше'];
+      const expenseCategories = ['Продукти', 'Транспорт', 'Розваги', 'Підписки', 'Одяг', 'Інше'];
+
+      function updateCategories() {
+        const selectedType = typeSelect.value;
+        const options = selectedType === 'income' ? incomeCategories : selectedType === 'expense' ? expenseCategories : [];
+
+        categorySelect.innerHTML = '';
+        categorySelect.disabled = options.length === 0;
+
+        if (options.length === 0) {
+          const placeholderOption = document.createElement('option');
+          placeholderOption.textContent = 'Спочатку оберіть тип';
+          placeholderOption.value = '';
+          categorySelect.appendChild(placeholderOption);
+          if (categoryHint) {
+            categoryHint.textContent = 'Спочатку оберіть тип';
+          }
+          return;
+        }
+
+        options.forEach((optionValue) => {
+          const option = document.createElement('option');
+          option.value = optionValue;
+          option.textContent = optionValue;
+          categorySelect.appendChild(option);
+        });
+
+        if (categoryHint) {
+          categoryHint.textContent = selectedType === 'income' ? 'Показано категорії для доходів' : 'Показано категорії для витрат';
+        }
+      }
+
+      if (typeSelect && categorySelect) {
+        typeSelect.addEventListener('change', updateCategories);
+        updateCategories();
+      }
+
+      if (toggleGoalButton && goalEditForm) {
+        toggleGoalButton.addEventListener('click', () => {
+          goalEditForm.classList.toggle('hidden');
+        });
+      }
+    </script>
+  </body>
+</html>

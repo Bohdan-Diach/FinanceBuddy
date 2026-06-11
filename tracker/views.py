@@ -1,0 +1,154 @@
+from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
+
+from django import forms
+from django.contrib import messages
+from django.db.models import Sum
+from django.shortcuts import redirect, render
+from django.utils import timezone
+
+from .models import Goal, Transaction
+
+
+class TransactionForm(forms.ModelForm):
+    class Meta:
+        model = Transaction
+        fields = ["amount", "transaction_type", "category", "date"]
+        labels = {
+            "amount": "Сума",
+            "transaction_type": "Тип",
+            "category": "Категорія",
+            "date": "Дата",
+        }
+        widgets = {
+            "amount": forms.NumberInput(attrs={"step": "0.01", "class": "w-full rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 focus:border-cyan-400 focus:outline-none"}),
+            "transaction_type": forms.Select(attrs={"class": "w-full rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 focus:border-cyan-400 focus:outline-none"}),
+            "category": forms.Select(attrs={"class": "w-full rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 focus:border-cyan-400 focus:outline-none", "disabled": "disabled"}),
+            "date": forms.DateInput(attrs={"type": "date", "class": "w-full rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 focus:border-cyan-400 focus:outline-none"}),
+        }
+
+
+class GoalForm(forms.ModelForm):
+    class Meta:
+        model = Goal
+        fields = ["name", "target_amount"]
+        labels = {
+            "name": "Назва цілі",
+            "target_amount": "Сума цілі",
+        }
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "w-full rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 focus:border-cyan-400 focus:outline-none"}),
+            "target_amount": forms.NumberInput(attrs={"step": "0.01", "class": "w-full rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 focus:border-cyan-400 focus:outline-none"}),
+        }
+
+
+def _quantize(value):
+    return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _add_months(year, month, months):
+    month_index = (year * 12) + (month - 1) + months
+    new_year, new_month_index = divmod(month_index, 12)
+    return new_year, new_month_index + 1
+
+
+def dashboard(request):
+    now = timezone.now()
+    current_month = now.month
+    current_year = now.year
+
+    goal = Goal.objects.first()
+    if goal is None:
+        goal = Goal.objects.create(name="Накопичення на Ford Fusion", target_amount=Decimal("500000"))
+
+    transactions = Transaction.objects.all()[:10]
+    total_income = Transaction.objects.filter(transaction_type="income").aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    total_expense = Transaction.objects.filter(transaction_type="expense").aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    balance = total_income - total_expense
+
+    monthly_income = Transaction.objects.filter(transaction_type="income", date__month=current_month, date__year=current_year).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    monthly_expense = Transaction.objects.filter(transaction_type="expense", date__month=current_month, date__year=current_year).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    monthly_net_savings = monthly_income - monthly_expense
+
+    expense_by_category = list(
+        Transaction.objects.filter(transaction_type="expense", date__month=current_month, date__year=current_year)
+        .values("category")
+        .annotate(total=Sum("amount"))
+        .order_by("-total")
+    )
+
+    expense_transactions = Transaction.objects.filter(transaction_type="expense", date__month=current_month, date__year=current_year)
+    expense_count = expense_transactions.count()
+    total_monthly_expenses = expense_transactions.aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    average_expense = total_monthly_expenses / Decimal(expense_count) if expense_count else Decimal("0")
+
+    insights = []
+    if expense_by_category:
+        biggest_category = max(expense_by_category, key=lambda item: item["total"])
+        insights.append(
+            f"Найбільше коштів цього місяця йде на {biggest_category['category']}. Можливо, тут можна трохи зекономити?"
+        )
+
+    if balance < 0 or monthly_net_savings <= 0:
+        insights.append("Попередження: ваші витрати перевищують доходи. У такому темпі досягти цілі неможливо.")
+    elif goal.target_amount > Decimal("0"):
+        remaining_to_goal = max(goal.target_amount - balance, Decimal("0"))
+        if remaining_to_goal <= 0:
+            insights.append("Ви вже досягли своєї фінансової мети. Продовжуйте в тому ж темпі.")
+        else:
+            months_to_goal = int((remaining_to_goal / monthly_net_savings).to_integral_value(rounding=ROUND_CEILING)) if monthly_net_savings > 0 else 0
+            target_year, target_month = _add_months(current_year, current_month, months_to_goal)
+            month_names = ["січня", "лютого", "березня", "квітня", "травня", "червня", "липня", "серпня", "вересня", "жовтня", "листопада", "грудня"]
+            insights.append(
+                f"При поточному темпі заощаджень ви досягнете своєї цілі через {months_to_goal} місяців (орієнтовно у {month_names[target_month - 1]} {target_year})."
+            )
+    else:
+        insights.append("Поки що немає витрат у цьому місяці. Додайте транзакцію, щоб побачити аналітику.")
+
+    if expense_count:
+        extra_savings = average_expense * Decimal("0.1") * Decimal(expense_count)
+        insights.append(
+            f"Ваш середній чек однієї витрати становить {_quantize(average_expense)} ₴. Зменшення цієї цифри всього на 10% дозволить заощадити додатково {_quantize(extra_savings)} ₴ до кінця місяця."
+        )
+
+    progress_percentage = min(max((balance / goal.target_amount * Decimal("100")), Decimal("0")), Decimal("100")) if goal.target_amount > 0 else Decimal("0")
+    remaining_to_goal = max(goal.target_amount - balance, Decimal("0"))
+
+    transaction_form = TransactionForm()
+    goal_form = GoalForm(instance=goal)
+
+    if request.method == "POST":
+        if "goal_submit" in request.POST:
+            goal_form = GoalForm(request.POST, instance=goal)
+            if goal_form.is_valid():
+                goal_form.save()
+                messages.success(request, "Ціль успішно оновлено.")
+                return redirect("dashboard")
+        else:
+            transaction_form = TransactionForm(request.POST)
+            if transaction_form.is_valid():
+                transaction_form.save()
+                messages.success(request, "Транзакцію додано успішно.")
+                return redirect("dashboard")
+
+    return render(
+        request,
+        "tracker/dashboard.html",
+        {
+            "transactions": transactions,
+            "balance": balance,
+            "total_income": total_income,
+            "total_expense": total_expense,
+            "monthly_income": monthly_income,
+            "monthly_expense": monthly_expense,
+            "expense_labels": [item["category"] for item in expense_by_category],
+            "expense_values": [float(item["total"]) for item in expense_by_category],
+            "insights": insights,
+            "goal": goal,
+            "goal_name": goal.name,
+            "goal_target": goal.target_amount,
+            "progress_percentage": progress_percentage,
+            "remaining_to_goal": remaining_to_goal,
+            "transaction_form": transaction_form,
+            "goal_form": goal_form,
+        },
+    )
