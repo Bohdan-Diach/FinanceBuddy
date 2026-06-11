@@ -1,10 +1,11 @@
 from datetime import date
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Transaction
+from .models import Goal, Transaction
 
 
 class DashboardMonthlyHistoryTests(TestCase):
@@ -51,3 +52,27 @@ class TransactionEditDeleteTests(TestCase):
         delete_response = self.client.post(reverse("delete_transaction", args=[transaction.pk]))
         self.assertEqual(delete_response.status_code, 302)
         self.assertFalse(Transaction.objects.filter(pk=transaction.pk).exists())
+
+
+class GoalEmptyStateTests(TestCase):
+    def test_dashboard_shows_empty_state_when_no_goal_exists(self):
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["goal"])
+        self.assertContains(response, "У вас ще немає активної фінансової цілі")
+        self.assertContains(response, "Встановити ціль")
+        self.assertFalse(Goal.objects.exists())
+
+    def test_dashboard_uses_goal_for_current_user(self):
+        user = get_user_model().objects.create_user(username="alice", password="secret123")
+        other_user = get_user_model().objects.create_user(username="bob", password="secret123")
+        Goal.objects.create(user=other_user, name="Чужа ціль", target_amount=Decimal("3000.00"))
+        current_goal = Goal.objects.create(user=user, name="Моя ціль", target_amount=Decimal("5000.00"))
+
+        self.client.login(username="alice", password="secret123")
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["goal"], current_goal)
+        self.assertEqual(response.context["goal_name"], "Моя ціль")

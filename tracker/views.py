@@ -103,9 +103,10 @@ def dashboard(request):
     current_month = now.month
     current_year = now.year
 
-    goal = Goal.objects.first()
-    if goal is None:
-        goal = Goal.objects.create(name="Накопичення на Ford Fusion", target_amount=Decimal("500000"))
+    if request.user.is_authenticated:
+        goal = Goal.objects.filter(user=request.user).first()
+    else:
+        goal = None
 
     transactions = Transaction.objects.all()[:10]
     total_income = Transaction.objects.filter(transaction_type="income").aggregate(total=Sum("amount"))["total"] or Decimal("0")
@@ -137,7 +138,7 @@ def dashboard(request):
 
     if balance < 0 or monthly_net_savings <= 0:
         insights.append("Попередження: ваші витрати перевищують доходи. У такому темпі досягти цілі неможливо.")
-    elif goal.target_amount > Decimal("0"):
+    elif goal is not None and goal.target_amount > Decimal("0"):
         remaining_to_goal = max(goal.target_amount - balance, Decimal("0"))
         if remaining_to_goal <= 0:
             insights.append("Ви вже досягли своєї фінансової мети. Продовжуйте в тому ж темпі.")
@@ -157,17 +158,31 @@ def dashboard(request):
             f"Ваш середній чек однієї витрати становить {_quantize(average_expense)} ₴. Зменшення цієї цифри всього на 10% дозволить заощадити додатково {_quantize(extra_savings)} ₴ до кінця місяця."
         )
 
-    progress_percentage = min(max((balance / goal.target_amount * Decimal("100")), Decimal("0")), Decimal("100")) if goal.target_amount > 0 else Decimal("0")
-    remaining_to_goal = max(goal.target_amount - balance, Decimal("0"))
+    if goal is not None:
+        progress_percentage = min(max((balance / goal.target_amount * Decimal("100")), Decimal("0")), Decimal("100")) if goal.target_amount > 0 else Decimal("0")
+        remaining_to_goal = max(goal.target_amount - balance, Decimal("0"))
+        goal_name = goal.name
+        goal_target = goal.target_amount
+    else:
+        progress_percentage = Decimal("0")
+        remaining_to_goal = Decimal("0")
+        goal_name = ""
+        goal_target = Decimal("0")
 
     transaction_form = TransactionForm()
-    goal_form = GoalForm(instance=goal)
+    goal_form = GoalForm(instance=goal) if goal is not None else GoalForm()
 
     if request.method == "POST":
         if "goal_submit" in request.POST:
             goal_form = GoalForm(request.POST, instance=goal)
             if goal_form.is_valid():
-                goal_form.save()
+                saved_goal = goal_form.save(commit=False)
+                if request.user.is_authenticated:
+                    saved_goal.user = request.user
+                else:
+                    saved_goal.user = None
+                saved_goal.save()
+                goal = saved_goal
                 messages.success(request, "Ціль успішно оновлено.")
                 return redirect("dashboard")
         else:
@@ -192,8 +207,8 @@ def dashboard(request):
             "expense_values": [float(item["total"]) for item in expense_by_category],
             "insights": insights,
             "goal": goal,
-            "goal_name": goal.name,
-            "goal_target": goal.target_amount,
+            "goal_name": goal_name,
+            "goal_target": goal_target,
             "progress_percentage": progress_percentage,
             "remaining_to_goal": remaining_to_goal,
             "transaction_form": transaction_form,
