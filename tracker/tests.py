@@ -1,3 +1,53 @@
-from django.test import TestCase
+from datetime import date
+from decimal import Decimal
 
-# Create your tests here.
+from django.test import TestCase
+from django.urls import reverse
+
+from .models import Transaction
+
+
+class DashboardMonthlyHistoryTests(TestCase):
+    def test_dashboard_includes_monthly_history_for_previous_months(self):
+        def month_date(offset):
+            today = date.today()
+            year = today.year + (today.month - 1 + offset) // 12
+            month = (today.month - 1 + offset) % 12 + 1
+            return date(year, month, 15)
+
+        Transaction.objects.create(amount=Decimal("1200.00"), transaction_type="income", category="Зарплата", date=month_date(0))
+        Transaction.objects.create(amount=Decimal("300.00"), transaction_type="expense", category="Продукти", date=month_date(0))
+        Transaction.objects.create(amount=Decimal("800.00"), transaction_type="income", category="Премія", date=month_date(-1))
+        Transaction.objects.create(amount=Decimal("150.00"), transaction_type="expense", category="Транспорт", date=month_date(-1))
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("monthly_history", response.context)
+        history = response.context["monthly_history"]
+        self.assertGreaterEqual(len(history), 2)
+        self.assertEqual(history[0]["income"], Decimal("1200.00"))
+        self.assertEqual(history[0]["expense"], Decimal("300.00"))
+
+
+class TransactionEditDeleteTests(TestCase):
+    def test_edit_and_delete_transaction_work(self):
+        transaction = Transaction.objects.create(amount=Decimal("100.00"), transaction_type="expense", category="Продукти", date=date.today())
+
+        edit_response = self.client.post(
+            reverse("edit_transaction", args=[transaction.pk]),
+            {
+                "amount": "150.50",
+                "transaction_type": "expense",
+                "category": "Транспорт",
+                "date": transaction.date.isoformat(),
+            },
+        )
+        self.assertEqual(edit_response.status_code, 302)
+        transaction.refresh_from_db()
+        self.assertEqual(transaction.amount, Decimal("150.50"))
+        self.assertEqual(transaction.category, "Транспорт")
+
+        delete_response = self.client.post(reverse("delete_transaction", args=[transaction.pk]))
+        self.assertEqual(delete_response.status_code, 302)
+        self.assertFalse(Transaction.objects.filter(pk=transaction.pk).exists())

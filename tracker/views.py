@@ -3,7 +3,7 @@ from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 from django import forms
 from django.contrib import messages
 from django.db.models import Sum
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .models import Goal, Transaction
@@ -20,10 +20,10 @@ class TransactionForm(forms.ModelForm):
             "date": "Дата",
         }
         widgets = {
-            "amount": forms.NumberInput(attrs={"step": "0.01", "class": "w-full rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 focus:border-cyan-400 focus:outline-none"}),
-            "transaction_type": forms.Select(attrs={"class": "w-full rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 focus:border-cyan-400 focus:outline-none"}),
-            "category": forms.Select(attrs={"class": "w-full rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 focus:border-cyan-400 focus:outline-none", "disabled": "disabled"}),
-            "date": forms.DateInput(attrs={"type": "date", "class": "w-full rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 focus:border-cyan-400 focus:outline-none"}),
+            "amount": forms.NumberInput(attrs={"step": "0.01", "class": "w-full min-h-[48px] rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-base text-slate-100 focus:border-cyan-400 focus:outline-none"}),
+            "transaction_type": forms.Select(attrs={"class": "w-full min-h-[48px] rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-base text-slate-100 focus:border-cyan-400 focus:outline-none"}),
+            "category": forms.Select(attrs={"class": "w-full min-h-[48px] rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-base text-slate-100 focus:border-cyan-400 focus:outline-none", "disabled": "disabled"}),
+            "date": forms.DateInput(attrs={"type": "date", "class": "w-full min-h-[48px] rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-base text-slate-100 focus:border-cyan-400 focus:outline-none"}),
         }
 
 
@@ -36,8 +36,8 @@ class GoalForm(forms.ModelForm):
             "target_amount": "Сума цілі",
         }
         widgets = {
-            "name": forms.TextInput(attrs={"class": "w-full rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 focus:border-cyan-400 focus:outline-none"}),
-            "target_amount": forms.NumberInput(attrs={"step": "0.01", "class": "w-full rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 focus:border-cyan-400 focus:outline-none"}),
+            "name": forms.TextInput(attrs={"class": "w-full min-h-[48px] rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-base text-slate-100 focus:border-cyan-400 focus:outline-none"}),
+            "target_amount": forms.NumberInput(attrs={"step": "0.01", "class": "w-full min-h-[48px] rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3 text-base text-slate-100 focus:border-cyan-400 focus:outline-none"}),
         }
 
 
@@ -49,6 +49,53 @@ def _add_months(year, month, months):
     month_index = (year * 12) + (month - 1) + months
     new_year, new_month_index = divmod(month_index, 12)
     return new_year, new_month_index + 1
+
+
+def _build_monthly_history(now, months=6):
+    month_names = ["січня", "лютого", "березня", "квітня", "травня", "червня", "липня", "серпня", "вересня", "жовтня", "листопада", "грудня"]
+    history = []
+    current_year = now.year
+    current_month = now.month
+
+    for offset in range(months):
+        target_year, target_month = _add_months(current_year, current_month, -offset)
+        transactions = Transaction.objects.filter(date__year=target_year, date__month=target_month)
+        income_total = transactions.filter(transaction_type="income").aggregate(total=Sum("amount"))["total"] or Decimal("0")
+        expense_total = transactions.filter(transaction_type="expense").aggregate(total=Sum("amount"))["total"] or Decimal("0")
+        history.append(
+            {
+                "label": f"{month_names[target_month - 1]} {target_year}",
+                "income": income_total,
+                "expense": expense_total,
+            }
+        )
+
+    return history
+
+
+def edit_transaction(request, pk):
+    transaction = get_object_or_404(Transaction, pk=pk)
+
+    if request.method == "POST":
+        form = TransactionForm(request.POST, instance=transaction)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Транзакцію оновлено.")
+            return redirect("dashboard")
+    else:
+        form = TransactionForm(instance=transaction)
+
+    return render(request, "tracker/edit_transaction.html", {"form": form, "transaction": transaction})
+
+
+def delete_transaction(request, pk):
+    transaction = get_object_or_404(Transaction, pk=pk)
+
+    if request.method == "POST":
+        transaction.delete()
+        messages.success(request, "Транзакцію видалено.")
+
+    return redirect("dashboard")
 
 
 def dashboard(request):
@@ -140,6 +187,7 @@ def dashboard(request):
             "total_expense": total_expense,
             "monthly_income": monthly_income,
             "monthly_expense": monthly_expense,
+            "monthly_history": _build_monthly_history(now),
             "expense_labels": [item["category"] for item in expense_by_category],
             "expense_values": [float(item["total"]) for item in expense_by_category],
             "insights": insights,

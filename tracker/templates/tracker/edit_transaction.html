@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="uk" class="h-full bg-slate-950">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Редагування транзакції</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="min-h-full bg-slate-950 text-slate-100">
+    <div class="mx-auto flex min-h-screen max-w-2xl flex-col px-4 py-8 sm:px-6">
+      <div class="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-xl shadow-black/20 sm:p-6">
+        <h1 class="text-2xl font-semibold">Редагувати транзакцію</h1>
+        <p class="mt-2 text-sm text-slate-400">Оновіть дані про дохід або витрату.</p>
+        <form method="post" class="mt-6 space-y-4">
+          {% csrf_token %}
+          <div>
+            <label class="mb-2 block text-sm text-slate-300" for="id_amount">Сума</label>
+            {{ form.amount }}
+          </div>
+          <div>
+            <label class="mb-2 block text-sm text-slate-300" for="id_transaction_type">Тип</label>
+            {{ form.transaction_type }}
+          </div>
+          <div>
+            <label class="mb-2 block text-sm text-slate-300" for="id_category">Категорія</label>
+            {{ form.category }}
+          </div>
+          <div>
+            <label class="mb-2 block text-sm text-slate-300" for="id_date">Дата</label>
+            {{ form.date }}
+          </div>
+          <div class="flex flex-col gap-3 sm:flex-row">
+            <button type="submit" class="w-full rounded-2xl bg-cyan-500 p-4 font-semibold text-slate-950 transition hover:bg-cyan-400">Зберегти</button>
+            <a href="{% url 'dashboard' %}" class="w-full rounded-2xl border border-slate-700 p-4 text-center font-semibold text-slate-300 transition hover:bg-slate-800">Скасувати</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>
