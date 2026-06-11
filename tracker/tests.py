@@ -54,6 +54,14 @@ class TransactionEditDeleteTests(TestCase):
         self.assertFalse(Transaction.objects.filter(pk=transaction.pk).exists())
 
 
+class MultiPageNavigationTests(TestCase):
+    def test_core_pages_render(self):
+        for view_name in ["dashboard", "analytics", "history", "goals", "profile"]:
+            with self.subTest(view_name=view_name):
+                response = self.client.get(reverse(view_name))
+                self.assertEqual(response.status_code, 200)
+
+
 class GoalEmptyStateTests(TestCase):
     def test_dashboard_shows_empty_state_when_no_goal_exists(self):
         response = self.client.get(reverse("dashboard"))

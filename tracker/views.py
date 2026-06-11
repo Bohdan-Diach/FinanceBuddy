@@ -116,21 +116,17 @@ def profile_view(request):
     )
 
 
-def dashboard(request):
-    now = timezone.now()
+def _get_dashboard_context(request, now=None):
+    now = now or timezone.now()
     current_month = now.month
     current_year = now.year
 
     if request.user.is_authenticated:
         goal = Goal.objects.filter(user=request.user).first()
-        earned_achievement_ids = list(
-            UserAchievement.objects.filter(user=request.user).values_list("achievement_id", flat=True)
-        )
     else:
         goal = None
-        earned_achievement_ids = []
 
-    transactions = Transaction.objects.all()[:10]
+    transactions = Transaction.objects.all()[:5]
     total_income = Transaction.objects.filter(transaction_type="income").aggregate(total=Sum("amount"))["total"] or Decimal("0")
     total_expense = Transaction.objects.filter(transaction_type="expense").aggregate(total=Sum("amount"))["total"] or Decimal("0")
     balance = total_income - total_expense
@@ -191,58 +187,81 @@ def dashboard(request):
         goal_name = ""
         goal_target = Decimal("0")
 
+    return {
+        "transactions": transactions,
+        "balance": balance,
+        "total_income": total_income,
+        "total_expense": total_expense,
+        "monthly_income": monthly_income,
+        "monthly_expense": monthly_expense,
+        "monthly_history": _build_monthly_history(now),
+        "expense_labels": [item["category"] for item in expense_by_category],
+        "expense_values": [float(item["total"]) for item in expense_by_category],
+        "insights": insights,
+        "goal": goal,
+        "goal_name": goal_name,
+        "goal_target": goal_target,
+        "progress_percentage": progress_percentage,
+        "remaining_to_goal": remaining_to_goal,
+    }
+
+
+def dashboard_view(request):
     transaction_form = TransactionForm()
+
+    if request.method == "POST":
+        transaction_form = TransactionForm(request.POST)
+        if transaction_form.is_valid():
+            transaction = transaction_form.save(commit=False)
+            if request.user.is_authenticated:
+                transaction.user = request.user
+            transaction.save()
+            if request.user.is_authenticated:
+                check_and_award_achievements(request.user)
+            messages.success(request, "Транзакцію додано успішно.")
+            return redirect("dashboard")
+
+    context = _get_dashboard_context(request)
+    context["transaction_form"] = transaction_form
+    return render(request, "tracker/dashboard.html", context)
+
+
+def analytics_view(request):
+    context = _get_dashboard_context(request)
+    return render(request, "tracker/analytics.html", context)
+
+
+def history_view(request):
+    transactions = Transaction.objects.all()
+    return render(request, "tracker/history.html", {"transactions": transactions})
+
+
+def goals_view(request):
+    goal = Goal.objects.filter(user=request.user).first() if request.user.is_authenticated else None
     goal_form = GoalForm(instance=goal) if goal is not None else GoalForm()
 
     if request.method == "POST":
-        if "goal_submit" in request.POST:
-            goal_form = GoalForm(request.POST, instance=goal)
-            if goal_form.is_valid():
-                saved_goal = goal_form.save(commit=False)
-                if request.user.is_authenticated:
-                    saved_goal.user = request.user
-                else:
-                    saved_goal.user = None
-                saved_goal.save()
-                goal = saved_goal
-                if request.user.is_authenticated:
-                    check_and_award_achievements(request.user)
-                messages.success(request, "Ціль успішно оновлено.")
-                return redirect("dashboard")
-        else:
-            transaction_form = TransactionForm(request.POST)
-            if transaction_form.is_valid():
-                transaction = transaction_form.save(commit=False)
-                if request.user.is_authenticated:
-                    transaction.user = request.user
-                transaction.save()
-                if request.user.is_authenticated:
-                    check_and_award_achievements(request.user)
-                messages.success(request, "Транзакцію додано успішно.")
-                return redirect("dashboard")
+        goal_form = GoalForm(request.POST, instance=goal)
+        if goal_form.is_valid():
+            saved_goal = goal_form.save(commit=False)
+            if request.user.is_authenticated:
+                saved_goal.user = request.user
+            else:
+                saved_goal.user = None
+            saved_goal.save()
+            goal = saved_goal
+            if request.user.is_authenticated:
+                check_and_award_achievements(request.user)
+            messages.success(request, "Ціль успішно оновлено.")
+            return redirect("goals")
 
-    return render(
-        request,
-        "tracker/dashboard.html",
-        {
-            "transactions": transactions,
-            "balance": balance,
-            "total_income": total_income,
-            "total_expense": total_expense,
-            "monthly_income": monthly_income,
-            "monthly_expense": monthly_expense,
-            "monthly_history": _build_monthly_history(now),
-            "expense_labels": [item["category"] for item in expense_by_category],
-            "expense_values": [float(item["total"]) for item in expense_by_category],
-            "insights": insights,
-            "goal": goal,
-            "goal_name": goal_name,
-            "goal_target": goal_target,
-            "progress_percentage": progress_percentage,
-            "remaining_to_goal": remaining_to_goal,
-            "transaction_form": transaction_form,
-            "goal_form": goal_form,
-            "achievements": Achievement.objects.all(),
-            "earned_achievement_ids": earned_achievement_ids,
-        },
-    )
+    context = _get_dashboard_context(request)
+    context.update({
+        "goal": goal,
+        "goal_form": goal_form,
+        "goal_name": goal.name if goal else "",
+        "goal_target": goal.target_amount if goal else Decimal("0"),
+        "progress_percentage": min(max((context["balance"] / goal.target_amount * Decimal("100")), Decimal("0")), Decimal("100")) if goal and goal.target_amount > 0 else Decimal("0"),
+        "remaining_to_goal": max(goal.target_amount - context["balance"], Decimal("0")) if goal else Decimal("0"),
+    })
+    return render(request, "tracker/goals.html", context)

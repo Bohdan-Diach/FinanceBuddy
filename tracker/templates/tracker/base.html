@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="uk" class="h-full bg-slate-900">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}FinanceBuddy{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body class="min-h-full bg-slate-900 text-slate-100">
+    <div class="mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <nav class="mb-6 rounded-2xl border border-slate-700 bg-slate-900/90 p-4 shadow-lg shadow-slate-950/30">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="text-lg font-semibold text-white">FinanceBuddy</div>
+          <div class="flex flex-wrap items-center gap-2">
+            <a href="{% url 'dashboard' %}" class="rounded-xl px-4 py-2 text-sm font-medium {% if request.resolver_match.url_name == 'dashboard' %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800{% endif %}">🏠 Головна</a>
+            <a href="{% url 'analytics' %}" class="rounded-xl px-4 py-2 text-sm font-medium {% if request.resolver_match.url_name == 'analytics' %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800{% endif %}">📊 Аналітика</a>
+            <a href="{% url 'history' %}" class="rounded-xl px-4 py-2 text-sm font-medium {% if request.resolver_match.url_name == 'history' %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800{% endif %}">📜 Історія</a>
+            <a href="{% url 'goals' %}" class="rounded-xl px-4 py-2 text-sm font-medium {% if request.resolver_match.url_name == 'goals' %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800{% endif %}">🎯 Цілі</a>
+            <a href="{% url 'profile' %}" class="rounded-xl px-4 py-2 text-sm font-medium {% if request.resolver_match.url_name == 'profile' %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800{% endif %}">👤 Профіль</a>
+          </div>
+        </div>
+      </nav>
+
+      {% if messages %}
+        <div class="mb-6 space-y-2">
+          {% for message in messages %}
+            <div class="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </div>
+  </body>
+</html>

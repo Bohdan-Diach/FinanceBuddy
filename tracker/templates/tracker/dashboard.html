@@ -1,308 +1,111 @@
-<!DOCTYPE html>
-<html lang="uk" class="h-full bg-slate-900">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FinanceBuddy Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  </head>
-  <body class="min-h-full bg-slate-900 text-slate-100">
-    <div class="mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <nav class="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-700 bg-slate-800/80 p-4 shadow-lg shadow-slate-950/30">
-        <a href="{% url 'dashboard' %}" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Дашборд</a>
-        <a href="{% url 'profile' %}" class="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-slate-700">Профіль</a>
-      </nav>
+{% extends 'tracker/base.html' %}
 
-      <header class="rounded-3xl border border-slate-700 bg-slate-800/80 p-6 shadow-lg shadow-slate-950/40 sm:p-8">
-        <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div class="max-w-2xl">
-            <p class="text-sm font-semibold uppercase tracking-[0.3em] text-indigo-400">FinanceBuddy</p>
-            <h1 class="mt-3 text-3xl font-semibold text-white sm:text-4xl">Ваш персональний фінансовий контроль</h1>
-            <p class="mt-3 text-sm text-slate-400 sm:text-base">Контролюйте доходи, витрати та баланс у стилі преміум-банкінгу.</p>
-          </div>
-          <div class="rounded-2xl border border-slate-700 bg-slate-900/80 px-5 py-4 shadow-inner shadow-slate-950/40">
-            <p class="text-sm text-slate-400">Загальний баланс</p>
-            <p class="mt-1 text-3xl font-semibold text-white">₴{{ balance|floatformat:2 }}</p>
-          </div>
-        </div>
-      </header>
+{% block title %}Головна | FinanceBuddy{% endblock %}
 
-      {% if messages %}
-        <div class="mt-6 space-y-2">
-          {% for message in messages %}
-            <div class="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
-              {{ message }}
-            </div>
-          {% endfor %}
-        </div>
-      {% endif %}
-
-      <section class="mt-6 grid gap-6 md:grid-cols-2">
-        <div class="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-lg shadow-slate-950/30">
-          {% if goal %}
-            <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 class="text-xl font-semibold text-white">Моя ціль</h2>
-                <p class="text-sm text-slate-400">{{ goal_name }}</p>
-              </div>
-              <div class="text-left sm:text-right">
-                <p class="text-sm text-slate-400">Залишилось</p>
-                <p class="text-lg font-semibold text-indigo-300">₴{{ remaining_to_goal|floatformat:2 }}</p>
-              </div>
-            </div>
-            <div class="h-2.5 overflow-hidden rounded-full bg-slate-700">
-              <div class="h-full rounded-full bg-indigo-500" style="width: {{ progress_percentage|floatformat:0 }}%"></div>
-            </div>
-            <div class="mt-3 flex flex-col gap-2 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-              <span>Прогрес: {{ progress_percentage|floatformat:0 }}%</span>
-              <span>Ціль: ₴{{ goal_target|floatformat:2 }}</span>
-            </div>
-            <button id="toggle-goal-form" type="button" class="mt-4 w-full rounded-2xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-3 text-sm font-medium text-indigo-300 transition hover:bg-indigo-500/20">
-              Змінити ціль
-            </button>
-            <form id="goal-edit-form" method="post" class="mt-4 hidden space-y-4 rounded-2xl border border-slate-700 bg-slate-900/70 p-4">
-              {% csrf_token %}
-              <input type="hidden" name="goal_submit" value="1" />
-              <div>
-                <label class="mb-2 block text-sm text-slate-300" for="id_name">Назва цілі</label>
-                {{ goal_form.name }}
-              </div>
-              <div>
-                <label class="mb-2 block text-sm text-slate-300" for="id_target_amount">Сума цілі</label>
-                {{ goal_form.target_amount }}
-              </div>
-              <button type="submit" class="w-full rounded-2xl bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-700">
-                Зберегти ціль
-              </button>
-            </form>
-          {% else %}
-            <div class="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-6 py-10 text-center">
-              <div class="mb-4 rounded-full border border-indigo-500/30 bg-indigo-500/10 p-3 text-indigo-300">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l2.5 2.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 class="text-lg font-semibold text-white">У вас ще немає активної фінансової цілі</h3>
-              <p class="mt-3 max-w-md text-sm leading-6 text-slate-400">У вас ще немає активної фінансової цілі. Встановіть її, щоб відстежувати свій прогрес!</p>
-              <button id="toggle-goal-form" type="button" class="mt-6 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700">
-                Встановити ціль
-              </button>
-              <form id="goal-edit-form" method="post" class="mt-4 hidden w-full max-w-md space-y-4 rounded-2xl border border-slate-700 bg-slate-800/80 p-4 text-left">
-                {% csrf_token %}
-                <input type="hidden" name="goal_submit" value="1" />
-                <div>
-                  <label class="mb-2 block text-sm text-slate-300" for="id_name">Назва цілі</label>
-                  {{ goal_form.name }}
-                </div>
-                <div>
-                  <label class="mb-2 block text-sm text-slate-300" for="id_target_amount">Сума цілі</label>
-                  {{ goal_form.target_amount }}
-                </div>
-                <button type="submit" class="w-full rounded-2xl bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-700">
-                  Зберегти ціль
-                </button>
-              </form>
-            </div>
-          {% endif %}
-        </div>
-
-        <div class="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-lg shadow-slate-950/30">
-          <div class="mb-4">
-            <h2 class="text-xl font-semibold text-white">Аналітика</h2>
-            <p class="mt-2 text-sm text-slate-400">Поради на основі поточного місяця.</p>
-          </div>
-          <div class="space-y-3">
-            {% for insight in insights %}
-              <div class="rounded-2xl border border-slate-700 bg-slate-900/70 px-4 py-3 text-sm text-slate-300">
-                {{ insight }}
-              </div>
-            {% endfor %}
-          </div>
-        </div>
-      </section>
-
-      <main class="mt-6 grid gap-6 lg:grid-cols-3">
-        <div class="space-y-6 lg:col-span-2">
-          <section class="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-lg shadow-slate-950/30">
-            <div class="mb-6 flex items-center justify-between">
-              <div>
-                <h2 class="text-xl font-semibold text-white">Останні транзакції</h2>
-                <p class="mt-1 text-sm text-slate-400">10 найновіших записів</p>
-              </div>
-            </div>
-            <div class="overflow-x-auto rounded-2xl border border-slate-700">
-              <table class="min-w-[560px] w-full divide-y divide-slate-700 text-sm">
-                <thead class="bg-slate-900/70">
-                  <tr>
-                    <th class="px-4 py-3 text-left font-medium text-slate-300">Дата</th>
-                    <th class="px-4 py-3 text-left font-medium text-slate-300">Категорія</th>
-                    <th class="px-4 py-3 text-left font-medium text-slate-300">Тип</th>
-                    <th class="px-4 py-3 text-right font-medium text-slate-300">Сума</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-700 bg-slate-800/70">
-                  {% for transaction in transactions %}
-                    <tr>
-                      <td class="px-4 py-3 text-slate-300">{{ transaction.date }}</td>
-                      <td class="px-4 py-3 text-slate-300">{{ transaction.category }}</td>
-                      <td class="px-4 py-3">
-                        {% if transaction.transaction_type == 'income' %}
-                          <span class="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-300">Дохід</span>
-                        {% else %}
-                          <span class="rounded-full bg-rose-500/15 px-2.5 py-1 text-xs font-medium text-rose-300">Витрата</span>
-                        {% endif %}
-                      </td>
-                      <td class="px-4 py-3 text-right font-medium {% if transaction.transaction_type == 'income' %}text-emerald-400{% else %}text-rose-400{% endif %}">
-                        <div class="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:justify-end">
-                          <span>{% if transaction.transaction_type == 'income' %}+{% else %}-{% endif %}₴{{ transaction.amount }}</span>
-                          <div class="flex gap-2">
-                            <a href="{% url 'edit_transaction' transaction.pk %}" class="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-xs font-medium text-indigo-300">Змінити</a>
-                            <form method="post" action="{% url 'delete_transaction' transaction.pk %}" class="inline">
-                              {% csrf_token %}
-                              <button type="submit" class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-xs font-medium text-rose-300">Прибрати</button>
-                            </form>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  {% empty %}
-                    <tr>
-                      <td colspan="4" class="px-4 py-8 text-center text-slate-400">Транзакцій поки немає.</td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section class="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-lg shadow-slate-950/30">
-            <div class="mb-6 flex items-center justify-between">
-              <div>
-                <h2 class="text-xl font-semibold text-white">Витрати за категоріями</h2>
-                <p class="mt-1 text-sm text-slate-400">За поточний місяць</p>
-              </div>
-            </div>
-            <div class="mx-auto flex h-72 max-w-xl items-center justify-center">
-              <canvas id="expensesChart"></canvas>
-            </div>
-            {{ expense_labels|json_script:"expense-labels" }}
-            {{ expense_values|json_script:"expense-values" }}
-          </section>
-        </div>
-
-        <div class="space-y-6 lg:col-span-1">
-          <section class="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-lg shadow-slate-950/30">
-            <div class="mb-6">
-              <h2 class="text-xl font-semibold text-white">Додати транзакцію</h2>
-              <p class="mt-2 text-sm text-slate-400">Створіть новий запис про дохід або витрату.</p>
-            </div>
-            <form method="post" class="space-y-4">
-              {% csrf_token %}
-              <div>
-                <label class="mb-2 block text-sm text-slate-300" for="id_amount">Сума</label>
-                {{ transaction_form.amount }}
-              </div>
-              <div>
-                <label class="mb-2 block text-sm text-slate-300" for="id_transaction_type">Тип</label>
-                {{ transaction_form.transaction_type }}
-              </div>
-              <div>
-                <label class="mb-2 block text-sm text-slate-300" for="id_category">Категорія</label>
-                {{ transaction_form.category }}
-                <p id="category-hint" class="mt-2 text-sm text-slate-400">Спочатку оберіть тип</p>
-              </div>
-              <div>
-                <label class="mb-2 block text-sm text-slate-300" for="id_date">Дата</label>
-                {{ transaction_form.date }}
-              </div>
-              <button type="submit" class="w-full rounded-2xl bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-700">
-                Зберегти транзакцію
-              </button>
-            </form>
-          </section>
-
-          <section class="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-lg shadow-slate-950/30">
-            <div class="mb-6">
-              <h2 class="text-xl font-semibold text-white">Історія доходів і витрат</h2>
-              <p class="mt-2 text-sm text-slate-400">За останні 6 місяців</p>
-            </div>
-            <div class="space-y-3">
-              {% for item in monthly_history %}
-                <div class="flex items-center justify-between rounded-2xl border border-slate-700 bg-slate-900/70 px-3 py-3 text-sm">
-                  <div class="min-w-0">
-                    <p class="font-medium text-slate-100">{{ item.label }}</p>
-                    <p class="text-slate-400">Місяць</p>
-                  </div>
-                  <div class="text-right">
-                    <p class="text-emerald-400">+₴{{ item.income|floatformat:2 }}</p>
-                    <p class="text-rose-400">-₴{{ item.expense|floatformat:2 }}</p>
-                  </div>
-                </div>
-              {% empty %}
-                <p class="rounded-2xl border border-slate-700 bg-slate-900/70 px-3 py-4 text-sm text-slate-400">Немає даних за попередні місяці.</p>
-              {% endfor %}
-            </div>
-          </section>
-        </div>
-      </main>
+{% block content %}
+<header class="rounded-3xl border border-slate-700 bg-slate-800/80 p-6 shadow-lg shadow-slate-950/40 sm:p-8">
+  <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+    <div class="max-w-2xl">
+      <p class="text-sm font-semibold uppercase tracking-[0.3em] text-indigo-400">FinanceBuddy</p>
+      <h1 class="mt-3 text-3xl font-semibold text-white sm:text-4xl">Ваш персональний фінансовий контроль</h1>
+      <p class="mt-3 text-sm text-slate-400 sm:text-base">Контролюйте доходи, витрати та баланс у стилі преміум-банкінгу.</p>
     </div>
+    <div class="rounded-2xl border border-slate-700 bg-slate-900/80 px-5 py-4 shadow-inner shadow-slate-950/40">
+      <p class="text-sm text-slate-400">Загальний баланс</p>
+      <p class="mt-1 text-3xl font-semibold text-white">₴{{ balance|floatformat:2 }}</p>
+    </div>
+  </div>
+</header>
 
-    <script>
-      const labels = JSON.parse(document.getElementById('expense-labels').textContent);
-      const values = JSON.parse(document.getElementById('expense-values').textContent);
-      const ctx = document.getElementById('expensesChart');
+<section class="mt-6 grid gap-6 lg:grid-cols-3">
+  <div class="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-lg shadow-slate-950/30 lg:col-span-2">
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold text-white">Останні 5 транзакцій</h2>
+      <p class="mt-1 text-sm text-slate-400">Найсвіжіші записи у вашій історії.</p>
+    </div>
+    {% if not goal %}
+      <div class="mb-4 rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-4 py-4 text-sm text-slate-400">
+        <p class="font-medium text-slate-200">У вас ще немає активної фінансової цілі</p>
+        <p class="mt-1">Встановіть ціль, щоб відстежувати свій прогрес!</p>
+        <a href="{% url 'goals' %}" class="mt-3 inline-flex rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700">Встановити ціль</a>
+      </div>
+    {% endif %}
+    <div class="overflow-x-auto rounded-2xl border border-slate-700">
+      <table class="min-w-[560px] w-full divide-y divide-slate-700 text-sm">
+        <thead class="bg-slate-900/70">
+          <tr>
+            <th class="px-4 py-3 text-left font-medium text-slate-300">Дата</th>
+            <th class="px-4 py-3 text-left font-medium text-slate-300">Категорія</th>
+            <th class="px-4 py-3 text-left font-medium text-slate-300">Тип</th>
+            <th class="px-4 py-3 text-right font-medium text-slate-300">Сума</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700 bg-slate-800/70">
+          {% for transaction in transactions %}
+            <tr>
+              <td class="px-4 py-3 text-slate-300">{{ transaction.date }}</td>
+              <td class="px-4 py-3 text-slate-300">{{ transaction.category }}</td>
+              <td class="px-4 py-3">
+                {% if transaction.transaction_type == 'income' %}
+                  <span class="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-300">Дохід</span>
+                {% else %}
+                  <span class="rounded-full bg-rose-500/15 px-2.5 py-1 text-xs font-medium text-rose-300">Витрата</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 text-right font-medium {% if transaction.transaction_type == 'income' %}text-emerald-400{% else %}text-rose-400{% endif %}">
+                <div class="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:justify-end">
+                  <span>{% if transaction.transaction_type == 'income' %}+{% else %}-{% endif %}₴{{ transaction.amount }}</span>
+                  <div class="flex gap-2">
+                    <a href="{% url 'edit_transaction' transaction.pk %}" class="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-xs font-medium text-indigo-300">Змінити</a>
+                    <form method="post" action="{% url 'delete_transaction' transaction.pk %}" class="inline">
+                      {% csrf_token %}
+                      <button type="submit" class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-xs font-medium text-rose-300">Прибрати</button>
+                    </form>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4" class="px-4 py-8 text-center text-slate-400">Транзакцій поки немає.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-      if (ctx) {
-        new Chart(ctx, {
-          type: 'doughnut',
-          data: {
-            labels: labels,
-            datasets: [{
-              data: values,
-              backgroundColor: ['#38bdf8', '#f472b6', '#34d399', '#f59e0b', '#8b5cf6', '#fb7185'],
-              borderColor: '#0f172a',
-              borderWidth: 2,
-            }],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                position: 'bottom',
-                labels: { color: '#e2e8f0' }
-              }
-            }
-          }
-        });
-      }
-
-      const typeSelect = document.getElementById('id_transaction_type');
-      const categorySelect = document.getElementById('id_category');
-      const categoryHint = document.getElementById('category-hint');
-      const toggleGoalButton = document.getElementById('toggle-goal-form');
-      const goalEditForm = document.getElementById('goal-edit-form');
-
-      const incomeCategories = ['Зарплата', 'Премія', 'Подарунок', 'Інше'];
-      const expenseCategories = ['Продукти', 'Транспорт', 'Розваги', 'Підписки', 'Одяг', 'Інше'];
-
-      function updateCategories() {
-        const selectedType = typeSelect.value;
-        const options = selectedType === 'income' ? incomeCategories : selectedType === 'expense' ? expenseCategories : [];
-
-        categorySelect.innerHTML = '';
-        categorySelect.disabled = options.length === 0;
-
-        if (options.length === 0) {
-          const placeholderOption = document.createElement('option');
-          placeholderOption.textContent = 'Спочатку оберіть тип';
-          placeholderOption.value = '';
-          categorySelect.appendChild(placeholderOption);
-          if (categoryHint) {
-            categoryHint.textContent = 'Спочатку оберіть тип';
-          }
-          return;
+  <div class="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-lg shadow-slate-950/30">
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold text-white">Додати транзакцію</h2>
+      <p class="mt-2 text-sm text-slate-400">Створіть новий запис про дохід або витрату.</p>
+    </div>
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="mb-2 block text-sm text-slate-300" for="id_amount">Сума</label>
+        {{ transaction_form.amount }}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm text-slate-300" for="id_transaction_type">Тип</label>
+        {{ transaction_form.transaction_type }}
+      </div>
+      <div>
+        <label class="mb-2 block text-sm text-slate-300" for="id_category">Категорія</label>
+        {{ transaction_form.category }}
+        <p id="category-hint" class="mt-2 text-sm text-slate-400">Спочатку оберіть тип</p>
+      </div>
+      <div>
+        <label class="mb-2 block text-sm text-slate-300" for="id_date">Дата</label>
+        {{ transaction_form.date }}
+      </div>
+      <button type="submit" class="w-full rounded-2xl bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-700">
+        Зберегти транзакцію
+      </button>
+    </form>
+  </div>
+</section>
+{% endblock %}
         }
 
         options.forEach((optionValue) => {

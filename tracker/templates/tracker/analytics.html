@@ -1,0 +1,60 @@
+{% extends 'tracker/base.html' %}
+
+{% block title %}Аналітика | FinanceBuddy{% endblock %}
+
+{% block content %}
+<section class="grid gap-6 lg:grid-cols-3">
+  <div class="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-lg shadow-slate-950/30 lg:col-span-2">
+    <div class="mb-6">
+      <h1 class="text-2xl font-semibold text-white">Аналітика</h1>
+      <p class="mt-2 text-sm text-slate-400">Кругова діаграма витрат за категоріями та рекомендації на основі поточного місяця.</p>
+    </div>
+    <div class="mx-auto flex h-72 max-w-xl items-center justify-center">
+      <canvas id="expensesChart"></canvas>
+    </div>
+    {{ expense_labels|json_script:"expense-labels" }}
+    {{ expense_values|json_script:"expense-values" }}
+  </div>
+
+  <div class="space-y-6">
+    <div class="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-lg shadow-slate-950/30">
+      <h2 class="text-xl font-semibold text-white">Поради</h2>
+      <div class="mt-4 space-y-3">
+        {% for insight in insights %}
+          <div class="rounded-2xl border border-slate-700 bg-slate-900/70 px-4 py-3 text-sm text-slate-300">
+            {{ insight }}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const labels = JSON.parse(document.getElementById('expense-labels').textContent);
+  const values = JSON.parse(document.getElementById('expense-values').textContent);
+  const ctx = document.getElementById('expensesChart');
+
+  if (ctx) {
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: values,
+          backgroundColor: ['#38bdf8', '#f472b6', '#34d399', '#f59e0b', '#8b5cf6', '#fb7185'],
+          borderColor: '#0f172a',
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#e2e8f0' } }
+        }
+      }
+    });
+  }
+</script>
+{% endblock %}
