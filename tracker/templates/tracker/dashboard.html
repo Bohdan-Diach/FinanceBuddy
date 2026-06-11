@@ -9,6 +9,11 @@
   </head>
   <body class="min-h-full bg-slate-900 text-slate-100">
     <div class="mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <nav class="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-700 bg-slate-800/80 p-4 shadow-lg shadow-slate-950/30">
+        <a href="{% url 'dashboard' %}" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Дашборд</a>
+        <a href="{% url 'profile' %}" class="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-slate-700">Профіль</a>
+      </nav>
+
       <header class="rounded-3xl border border-slate-700 bg-slate-800/80 p-6 shadow-lg shadow-slate-950/40 sm:p-8">
         <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div class="max-w-2xl">
@@ -187,32 +192,6 @@
         </div>
 
         <div class="space-y-6 lg:col-span-1">
-          <section class="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-lg shadow-slate-950/30">
-            <div class="mb-6">
-              <h2 class="text-xl font-semibold text-white">Мої нагороди</h2>
-              <p class="mt-2 text-sm text-slate-400">Розкривайте нові досягнення за активність у FinanceBuddy.</p>
-            </div>
-            <div class="grid gap-3 sm:grid-cols-2">
-              {% for achievement in achievements %}
-                {% if achievement.id in earned_achievement_ids %}
-                  <div class="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 shadow-lg shadow-emerald-500/10">
-                    <div class="text-3xl">{{ achievement.icon }}</div>
-                    <h3 class="mt-3 text-sm font-semibold text-white">{{ achievement.title }}</h3>
-                    <p class="mt-2 text-xs leading-5 text-slate-300">{{ achievement.description }}</p>
-                  </div>
-                {% else %}
-                  <div class="rounded-2xl border border-slate-700 bg-slate-900/70 p-4 opacity-40 grayscale">
-                    <div class="text-3xl">{{ achievement.icon }}</div>
-                    <h3 class="mt-3 text-sm font-semibold text-white">{{ achievement.title }}</h3>
-                    <p class="mt-2 text-xs leading-5 text-slate-300">{{ achievement.description }}</p>
-                  </div>
-                {% endif %}
-              {% empty %}
-                <p class="sm:col-span-2 rounded-2xl border border-slate-700 bg-slate-900/70 px-3 py-4 text-sm text-slate-400">Нагороди ще не створені.</p>
-              {% endfor %}
-            </div>
-          </section>
-
           <section class="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-lg shadow-slate-950/30">
             <div class="mb-6">
               <h2 class="text-xl font-semibold text-white">Додати транзакцію</h2>

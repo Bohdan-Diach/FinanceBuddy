@@ -99,6 +99,23 @@ def delete_transaction(request, pk):
     return redirect("dashboard")
 
 
+def profile_view(request):
+    achievements = Achievement.objects.all()
+    earned_achievement_ids = list(
+        UserAchievement.objects.filter(user=request.user).values_list("achievement_id", flat=True)
+    ) if request.user.is_authenticated else []
+
+    return render(
+        request,
+        "tracker/profile.html",
+        {
+            "user": request.user,
+            "achievements": achievements,
+            "earned_achievement_ids": earned_achievement_ids,
+        },
+    )
+
+
 def dashboard(request):
     now = timezone.now()
     current_month = now.month
